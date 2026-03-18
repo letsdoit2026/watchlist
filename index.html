@@ -351,7 +351,7 @@
 <div class="toast" id="toast"></div>
 <input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImport(event)" />
 
-<script>
+<script type="module">
 // ── NAVER STOCK LINK ──
 function openStock(ticker) {
   const url = "https://finance.naver.com/item/main.naver?code=" + ticker;
@@ -521,9 +521,46 @@ let sections = [];
 let activeFilter = "all";
 let currentSectionKey = null;
 
-function loadData() {
-  try { const s = localStorage.getItem("wl_v5"); if (s) { sections = JSON.parse(s); migrateTickers(); return; } } catch(e) {}
+// ── FIREBASE 설정 ──
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvhRiP656Vf-SOW636BIJwxVAaRUZg7RU",
+  authDomain: "watchlist-15f7a.firebaseapp.com",
+  projectId: "watchlist-15f7a",
+  storageBucket: "watchlist-15f7a.firebasestorage.app",
+  messagingSenderId: "473303650314",
+  appId: "1:473303650314:web:f086288c787ecae8c90ff3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const DOC_REF = doc(db, "watchlist", "sections");
+
+async function loadData() {
+  try {
+    const snap = await getDoc(DOC_REF);
+    if (snap.exists()) {
+      sections = snap.data().data;
+      migrateTickers();
+      return;
+    }
+  } catch(e) {
+    console.warn("Firebase 로드 실패, 로컬 사용:", e);
+    try { const s = localStorage.getItem("wl_v5"); if (s) { sections = JSON.parse(s); migrateTickers(); return; } } catch(e2) {}
+  }
   sections = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  await saveData();
+}
+
+async function saveData() {
+  try {
+    await setDoc(DOC_REF, { data: sections });
+  } catch(e) {
+    console.warn("Firebase 저장 실패, 로컬 저장:", e);
+    localStorage.setItem("wl_v5", JSON.stringify(sections));
+  }
 }
 
 // localStorage에 저장된 기존 종목 중 ticker가 없는 것을 DEFAULT_DATA에서 보완
@@ -540,8 +577,6 @@ function migrateTickers() {
   });
   if (changed) saveData();
 }
-
-function saveData() { localStorage.setItem("wl_v5", JSON.stringify(sections)); }
 
 // ── UTILS ──
 function fmt(n) { return Math.round(n).toLocaleString("ko-KR"); }
@@ -989,8 +1024,32 @@ document.getElementById("modal").addEventListener("click", e => {
 const t = localStorage.getItem("wl_theme")||"light";
 document.documentElement.setAttribute("data-theme", t);
 document.getElementById("theme-btn").textContent = t==="dark"?"☀️":"🌙";
-loadData(); renderSummary(); renderFilters(); render();
-updateClock(); setInterval(updateClock, 1000);
+
+// onclick 핸들러에서 접근할 수 있도록 전역 등록
+window.setFilter = setFilter;
+window.openAddStock = openAddStock;
+window.openAddSection = openAddSection;
+window.deleteStock = deleteStock;
+window.deleteSection = deleteSection;
+window.closeModal = closeModal;
+window.lookupTicker = lookupTicker;
+window.checkSubmit = checkSubmit;
+window.submitAddStock = submitAddStock;
+window.submitAddSection = submitAddSection;
+window.pickIcon = pickIcon;
+window.toggleTheme = toggleTheme;
+window.exportData = exportData;
+window.importData = importData;
+window.handleImport = handleImport;
+window.refreshAll = refreshAll;
+window.openStock = openStock;
+window.editSectionName = editSectionName;
+
+(async () => {
+  await loadData();
+  renderSummary(); renderFilters(); render();
+  updateClock(); setInterval(updateClock, 1000);
+})();
 </script>
 </body>
 </html>
