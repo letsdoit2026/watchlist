@@ -153,7 +153,7 @@ def main():
         failed = [t for t in TICKERS if t not in results]
         print(f"실패 티커: {failed}")
     print("\n브라우저에서 현황판을 새로고침(F5)하면 업데이트됩니다.")
-    input("\nEnter 키를 누르면 창이 닫힙니다...")
+    
 
 if __name__ == "__main__":
     main()
