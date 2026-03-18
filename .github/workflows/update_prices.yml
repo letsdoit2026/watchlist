@@ -1,26 +1,22 @@
-
 name: Update Stock Prices
-
 on:
   schedule:
     - cron: '0 1 * * 1-5'
   workflow_dispatch:
-
+permissions:
+  contents: write
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Fetch prices from Naver
         run: python update_prices.py
-
       - name: Commit and push prices.json
         run: |
           git config user.name "github-actions"
