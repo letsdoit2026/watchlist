@@ -171,8 +171,11 @@
   .stock-table th {
     font-size: 11px; color: var(--text3); font-weight: 500;
     padding: 4px 6px; text-align: left; border-bottom: 0.5px solid var(--border);
-    overflow: hidden;
+    overflow: hidden; cursor: pointer; user-select: none; transition: color 0.12s;
   }
+  .stock-table th:hover { color: var(--text); }
+  .stock-table th.sort-asc, .stock-table th.sort-desc { color: var(--accent); }
+  .sort-arrow { font-size: 9px; margin-left: 2px; opacity: 0.7; }
   .stock-table th:first-child { padding-left: 12px; }
   .stock-table th:not(:first-child) { text-align: right; }
   .stock-table th:last-child { padding-right: 10px; }
@@ -520,6 +523,8 @@ const DEFAULT_DATA = [
 let sections = [];
 let activeFilter = "all";
 let currentSectionKey = null;
+// 섹션별 정렬 상태: { sectionKey: { col: 'name'|'price'|'diff'|'pct', dir: 'asc'|'desc' } }
+const sectionSortState = {};
 
 // ── FIREBASE 설정 ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
@@ -722,7 +727,46 @@ function sortStocks(stocks) {
   return a;
 }
 
-// ── RENDER ──
+// ── SECTION SORT ──
+function sortSection(secKey, col) {
+  const cur = sectionSortState[secKey];
+  if (cur && cur.col === col) {
+    // 같은 컬럼 클릭 → 방향 토글, desc면 초기화
+    if (cur.dir === 'asc') sectionSortState[secKey] = { col, dir: 'desc' };
+    else delete sectionSortState[secKey];
+  } else {
+    sectionSortState[secKey] = { col, dir: 'asc' };
+  }
+  render();
+}
+
+function applySectionSort(stocks, secKey) {
+  const s = sectionSortState[secKey];
+  if (!s) return stocks;
+  const arr = [...stocks];
+  arr.sort((a, b) => {
+    let va, vb;
+    if (s.col === 'name')  { va = a.name; vb = b.name; }
+    else if (s.col === 'price') { va = a.price; vb = b.price; }
+    else if (s.col === 'diff')  { va = a.diff;  vb = b.diff; }
+    else if (s.col === 'pct')   { va = a.pct;   vb = b.pct; }
+    if (s.col === 'name') return s.dir === 'asc' ? va.localeCompare(vb, 'ko') : vb.localeCompare(va, 'ko');
+    return s.dir === 'asc' ? va - vb : vb - va;
+  });
+  return arr;
+}
+
+function sortArrow(secKey, col) {
+  const s = sectionSortState[secKey];
+  if (!s || s.col !== col) return '<span class="sort-arrow">⇅</span>';
+  return `<span class="sort-arrow">${s.dir === 'asc' ? '▲' : '▼'}</span>`;
+}
+
+function sortClass(secKey, col) {
+  const s = sectionSortState[secKey];
+  if (!s || s.col !== col) return '';
+  return s.dir === 'asc' ? ' sort-asc' : ' sort-desc';
+}
 function render() {
   const q = (document.getElementById("search").value||"").trim().toLowerCase();
   const vis = activeFilter==="all"||activeFilter==="up"||activeFilter==="dn"
@@ -734,23 +778,31 @@ function render() {
     if (activeFilter==="up") st = st.filter(s=>s.pct>0);
     if (activeFilter==="dn") st = st.filter(s=>s.pct<0);
     st = sortStocks(st);
+    st = applySectionSort(st, sec.key);
+    const sk = sec.key;
     html += `<div class="section-card">
       <div class="section-header">
         <div class="section-header-left">
           <div class="section-icon" style="background:var(--accent-bg)">${sec.icon||"📋"}</div>
-          <span class="section-title" title="클릭하여 이름 수정" onclick="editSectionName(event,'${sec.key}')">${sec.label}</span>
+          <span class="section-title" title="클릭하여 이름 수정" onclick="editSectionName(event,'${sk}')">${sec.label}</span>
           <span class="section-count">${st.length}종목</span>
         </div>
         <div class="section-header-actions">
-          <button class="add-stock-btn" onclick="openAddStock('${sec.key}')">＋ 종목추가</button>
-          <button class="del-section-btn" onclick="deleteSection('${sec.key}')">×</button>
+          <button class="add-stock-btn" onclick="openAddStock('${sk}')">＋ 종목추가</button>
+          <button class="del-section-btn" onclick="deleteSection('${sk}')">×</button>
         </div>
       </div>
       <table class="stock-table">
         <colgroup>
           <col class="col-name"><col class="col-price"><col class="col-diff"><col class="col-pct"><col class="col-act">
         </colgroup>
-        <thead><tr><th>종목명</th><th>현재가</th><th>전일대비</th><th>등락률</th><th></th></tr></thead>
+        <thead><tr>
+          <th class="${sortClass(sk,'name')}" onclick="sortSection('${sk}','name')">종목명${sortArrow(sk,'name')}</th>
+          <th class="${sortClass(sk,'price')}" onclick="sortSection('${sk}','price')">현재가${sortArrow(sk,'price')}</th>
+          <th class="${sortClass(sk,'diff')}" onclick="sortSection('${sk}','diff')">전일대비${sortArrow(sk,'diff')}</th>
+          <th class="${sortClass(sk,'pct')}" onclick="sortSection('${sk}','pct')">등락률${sortArrow(sk,'pct')}</th>
+          <th></th>
+        </tr></thead>
         <tbody>`;
     if (!st.length) {
       html += `<tr class="empty-row"><td colspan="5">종목이 없습니다</td></tr>`;
@@ -1026,6 +1078,7 @@ document.documentElement.setAttribute("data-theme", t);
 document.getElementById("theme-btn").textContent = t==="dark"?"☀️":"🌙";
 
 // onclick 핸들러에서 접근할 수 있도록 전역 등록
+window.sortSection = sortSection;
 window.setFilter = setFilter;
 window.openAddStock = openAddStock;
 window.openAddSection = openAddSection;
