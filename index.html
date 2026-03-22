@@ -372,8 +372,8 @@ const DEFAULT_DATA = [
     { name:"KODEX 코스닥150", ticker:"229200", price:0, diff:0, pct:0 },
     { name:"KODEX 200타겟위클리커버드콜", ticker:"498400", price:0, diff:0, pct:0 },
     { name:"TIGER 배당커버드콜액티브", ticker:"472150", price:0, diff:0, pct:0 },
-    { name:"KODEX 미국배당커버드콜액티브", ticker:"441640", price:0, diff:0, pct:0 },
-    { name:"ACE 미국500데일리타겟커버드콜(합성)", ticker:"480030", price:0, diff:0, pct:0 },
+    { name:"KODEX 미국배당커버드콜액티브", ticker:"464280", price:0, diff:0, pct:0 },
+    { name:"ACE 미국500데일리타겟커버드콜(합성)", ticker:"483320", price:0, diff:0, pct:0 },
     { name:"TIME 미국나스닥100액티브", ticker:"426030", price:0, diff:0, pct:0 },
     { name:"RISE 미국테크100데일리고정커버드콜", ticker:"491620", price:0, diff:0, pct:0 },
     { name:"TIME 글로벌우주테크&방산액티브", ticker:"478150", price:0, diff:0, pct:0 },
@@ -384,7 +384,7 @@ const DEFAULT_DATA = [
     { name:"TIME 글로벌AI인공지능액티브", ticker:"456600", price:0, diff:0, pct:0 },
     { name:"RISE 미국AI밸류체인데일리고정커버드콜", ticker:"490590", price:0, diff:0, pct:0 },
     { name:"TIGER 미국AI빅테크10타겟데일리커버드콜", ticker:"493810", price:0, diff:0, pct:0 },
-    { name:"ACE 미국빅테크7+데일리타겟커버드콜(합성)", ticker:"480020", price:0, diff:0, pct:0 },
+    { name:"ACE 미국빅테크7+데일리타겟커버드콜(합성)", ticker:"483330", price:0, diff:0, pct:0 },
   ]},
   { key:"monthly", label:"보유_월배당", icon:"💰", stocks:[
     { name:"ACE 미국빅테크7+데일리타겟커버드콜(합성)", ticker:"483330", price:0, diff:0, pct:0 },
@@ -595,47 +595,17 @@ function toast(msg, ms=2400) {
   setTimeout(() => t.classList.remove("show"), ms);
 }
 
-// ── NAVER FINANCE API — prices.json 에서 로드 ──
-async function loadPricesJson() {
-  try {
-    const r = await fetch("prices.json?t=" + Date.now());
-    if (!r.ok) return null;
-    return await r.json();
-  } catch(e) { return null; }
-}
-
-async function naverFetch(ticker) {
-  const code = ticker.replace(/\D/g, "").padStart(6, "0");
-  const url = `https://m.stock.naver.com/api/stock/${code}/basic`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const r = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    const name  = d.stockName || d.itemName || "";
-    const price = parseInt((d.closePrice || "0").toString().replace(/,/g,"")) || 0;
-    const diff  = parseInt((d.compareToPreviousClosePrice || "0").toString().replace(/[,+]/g,"")) || 0;
-    const pct   = parseFloat((d.fluctuationsRatio || "0").toString().replace(/,/g,"")) || 0;
-    if (!name || !price) throw new Error("데이터 없음");
-    return { name, price, diff, pct, code };
-  } catch(e) {
-    clearTimeout(timer);
-    throw e;
-  }
-}
-
-// ── REFRESH ALL — prices.json 우선, 없으면 직접 API ──
+// ── REFRESH ALL — prices.json (GitHub Actions가 갱신) ──
 async function refreshAll() {
   const btn = document.getElementById("refresh-all-btn");
   btn.classList.add("spinning"); btn.disabled = true;
-  toast("prices.json 로드 중...", 2000);
+  toast("가격 불러오는 중...", 2000);
 
-  const priceMap = await loadPricesJson();
+  try {
+    const r = await fetch("prices.json?t=" + Date.now());
+    if (!r.ok) throw new Error("prices.json 없음");
+    const priceMap = await r.json();
 
-  if (priceMap) {
-    // prices.json 성공 → 바로 적용
     let ok = 0, fail = 0;
     sections.forEach(sec => {
       sec.stocks.forEach(stock => {
@@ -649,33 +619,11 @@ async function refreshAll() {
     saveData(); renderSummary(); render();
     btn.classList.remove("spinning"); btn.disabled = false;
     toast(fail === 0
-      ? `✓ ${ok}종목 갱신 완료 (prices.json)`
-      : `✓ ${ok}종목 완료 · ${fail}종목 데이터 없음 (prices.json)`, 4000);
-  } else {
-    // prices.json 없음 → 직접 API 시도
-    toast("prices.json 없음 — 직접 요청 시도 중...", 2000);
-    const items = sections.flatMap(s => s.stocks.filter(st => st.ticker).map(st => ({sec:s, stock:st})));
-    const tickerSet = [...new Set(items.map(i => i.stock.ticker))];
-    const map = {};
-    const BATCH = 5;
-    for (let i = 0; i < tickerSet.length; i += BATCH) {
-      const batch = tickerSet.slice(i, i + BATCH);
-      const results = await Promise.allSettled(batch.map(t => naverFetch(t).then(d => ({t, d}))));
-      results.forEach(r => { if (r.status === "fulfilled") map[r.value.t] = r.value.d; });
-      const done = Math.min(i + BATCH, tickerSet.length);
-      toast(`갱신 중... ${done} / ${tickerSet.length}`, 1200);
-      if (i + BATCH < tickerSet.length) await new Promise(res => setTimeout(res, 800));
-    }
-    let ok = 0, fail = 0;
-    items.forEach(({stock}) => {
-      if (map[stock.ticker]) {
-        const d = map[stock.ticker];
-        stock.price = d.price; stock.diff = d.diff; stock.pct = d.pct; ok++;
-      } else fail++;
-    });
-    saveData(); renderSummary(); render();
+      ? `✓ ${ok}종목 갱신 완료`
+      : `✓ ${ok}종목 완료 · ${fail}종목 데이터 없음`, 4000);
+  } catch(e) {
     btn.classList.remove("spinning"); btn.disabled = false;
-    toast(fail === 0 ? `✓ ${ok}종목 갱신 완료` : `✓ ${ok}종목 완료 · ${fail}종목 실패`, 4000);
+    toast("⚠ 가격 로드 실패", 3000);
   }
 }
 
@@ -888,15 +836,15 @@ function openAddStock(sk) {
 
   document.getElementById("modal-body").innerHTML = `
     <div class="form-group">
-      <label class="form-label">① 종목코드(티커)로 자동 조회</label>
+      <label class="form-label">① 종목코드(티커) *</label>
       <div class="ticker-row">
         <input class="form-input" id="f-ticker" placeholder="6자리  예) 473190"
-          maxlength="6" inputmode="numeric"
-          oninput="this.value=this.value.replace(/\\D/g,'')"
+          maxlength="8" inputmode="numeric"
+          oninput="checkSubmit()"
           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupTicker()}" />
-        <button class="lookup-btn" id="lbtn" onclick="lookupTicker()">조회</button>
+        <button class="lookup-btn" id="lbtn" onclick="lookupTicker()">자동조회</button>
       </div>
-      <p class="lookup-hint">코드를 모를 경우 → <a href="https://finance.naver.com/etf/" target="_blank" style="color:var(--accent)">네이버 ETF 목록</a>에서 확인 후 입력하세요.</p>
+      <p class="lookup-hint">티커만 입력해도 추가 가능해요. 가격은 다음 갱신 시 자동으로 채워집니다.<br>자동조회는 로컬 서버 환경에서만 작동합니다.</p>
     </div>
     <div class="result-card" id="rc">
       <div class="result-name" id="rc-name"></div>
@@ -905,19 +853,19 @@ function openAddStock(sk) {
       <div class="result-chg" id="rc-chg"></div>
     </div>
     <div class="lookup-error" id="lerr"></div>
-    <div class="divider"><div class="divider-line"></div><span class="divider-label">또는 직접 입력</span><div class="divider-line"></div></div>
+    <div class="divider"><div class="divider-line"></div><span class="divider-label">종목 정보 입력</span><div class="divider-line"></div></div>
     <div class="form-group">
       <label class="form-label">② 종목명 *</label>
       <input class="form-input" id="f-name" placeholder="예: TIGER 코리아AI반도체" oninput="checkSubmit()" />
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">현재가</label>
-        <input class="form-input" id="f-price" type="number" placeholder="예: 17820" oninput="checkSubmit()" />
+        <label class="form-label">현재가 (선택)</label>
+        <input class="form-input" id="f-price" type="number" placeholder="비워도 됩니다" />
       </div>
       <div class="form-group">
-        <label class="form-label">전일대비</label>
-        <input class="form-input" id="f-diff" type="number" placeholder="예: 945 / -100" />
+        <label class="form-label">전일대비 (선택)</label>
+        <input class="form-input" id="f-diff" type="number" placeholder="비워도 됩니다" />
       </div>
     </div>
     <div class="form-group">
@@ -930,9 +878,9 @@ function openAddStock(sk) {
 }
 
 function checkSubmit() {
-  const n = (document.getElementById("f-name")?.value||"").trim();
-  const p = document.getElementById("f-price")?.value;
-  document.getElementById("modal-submit").disabled = !(n && p && parseFloat(p) > 0);
+  const ticker = (document.getElementById("f-ticker")?.value || "").trim();
+  const name   = (document.getElementById("f-name")?.value || "").trim();
+  document.getElementById("modal-submit").disabled = !(ticker && name);
 }
 
 async function lookupTicker() {
@@ -976,17 +924,14 @@ function showErr(msg) {
 function submitAddStock() {
   const ticker = (document.getElementById("f-ticker")?.value||"").trim();
   const name   = (document.getElementById("f-name").value||"").trim();
-  const price  = parseFloat(document.getElementById("f-price").value);
-  const dv = document.getElementById("f-diff").value;
-  const pv = document.getElementById("f-pct").value;
-  if (!name) { alert("종목명을 입력해 주세요."); return; }
-  if (isNaN(price)||price<=0) { alert("현재가를 입력해 주세요."); return; }
-  let diff = parseFloat(dv)||0, pct = parseFloat(pv)||0;
-  if (dv&&!pv&&price) pct = parseFloat(((diff/(price-diff))*100).toFixed(2));
-  if (pv&&!dv&&price) diff = Math.round(price*pct/(100+pct));
+  const price  = parseFloat(document.getElementById("f-price").value) || 0;
+  const diff   = parseFloat(document.getElementById("f-diff").value) || 0;
+  const pct    = parseFloat(document.getElementById("f-pct")?.value) || 0;
+  if (!ticker) { alert("종목코드(티커)를 입력해 주세요."); return; }
+  if (!name)   { alert("종목명을 입력해 주세요."); return; }
   sections.find(s=>s.key===currentSectionKey).stocks.push({ name, ticker, price, diff, pct });
   saveData(); renderSummary(); render(); closeModal();
-  toast(`✓ "${name}" 추가 완료`);
+  toast(`✓ "${name}" 추가 완료 — 가격은 다음 갱신 시 자동으로 채워집니다`);
 }
 
 // ── MODAL: 섹션 추가 ──
