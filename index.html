@@ -372,7 +372,7 @@ const DEFAULT_DATA = [
     { name:"KODEX 코스닥150", ticker:"229200", price:0, diff:0, pct:0 },
     { name:"KODEX 200타겟위클리커버드콜", ticker:"498400", price:0, diff:0, pct:0 },
     { name:"TIGER 배당커버드콜액티브", ticker:"472150", price:0, diff:0, pct:0 },
-    { name:"KODEX 미국배당커버드콜액티브", ticker:"464280", price:0, diff:0, pct:0 },
+    { name:"KODEX 미국배당커버드콜액티브", ticker:"441640", price:0, diff:0, pct:0 },
     { name:"ACE 미국500데일리타겟커버드콜(합성)", ticker:"483320", price:0, diff:0, pct:0 },
     { name:"TIME 미국나스닥100액티브", ticker:"426030", price:0, diff:0, pct:0 },
     { name:"RISE 미국테크100데일리고정커버드콜", ticker:"491620", price:0, diff:0, pct:0 },
@@ -394,12 +394,12 @@ const DEFAULT_DATA = [
     { name:"TIGER 미국AI빅테크10타겟데일리커버드콜", ticker:"493810", price:0, diff:0, pct:0 },
     { name:"RISE 미국AI밸류체인데일리고정커버드콜", ticker:"490590", price:0, diff:0, pct:0 },
     { name:"RISE 미국테크100데일리고정커버드콜", ticker:"491620", price:0, diff:0, pct:0 },
-    { name:"KODEX 미국배당커버드콜액티브", ticker:"464280", price:0, diff:0, pct:0 },
+    { name:"KODEX 미국배당커버드콜액티브", ticker:"441640", price:0, diff:0, pct:0 },
     { name:"ACE 미국500데일리타겟커버드콜(합성)", ticker:"483320", price:0, diff:0, pct:0 },
   ]},
   { key:"theme", label:"보유_테마", icon:"🎯", stocks:[
     { name:"TIGER 코리아AI전력기기TOP3플러스", ticker:"0117V0", price:0, diff:0, pct:0 },
-    { name:"TIGER 반도체TOP10", ticker:"091230", price:0, diff:0, pct:0 },
+    { name:"TIGER 반도체TOP10", ticker:"396500", price:0, diff:0, pct:0 },
     { name:"RISE AI반도체TOP10", ticker:"0093A0", price:0, diff:0, pct:0 },
     { name:"SOL 반도체전공정", ticker:"475300", price:0, diff:0, pct:0 },
     { name:"HANARO Fn K-반도체", ticker:"395270", price:0, diff:0, pct:0 },
@@ -410,7 +410,7 @@ const DEFAULT_DATA = [
     { name:"KODEX 방산TOP10", ticker:"0080G0", price:0, diff:0, pct:0 },
     { name:"TIGER 조선TOP10", ticker:"494670", price:0, diff:0, pct:0 },
     { name:"SOL 조선TOP3플러스", ticker:"480030", price:0, diff:0, pct:0 },
-    { name:"KODEX 조선TOP10", ticker:"480020", price:0, diff:0, pct:0 },
+    { name:"KODEX 조선TOP10", ticker:"0115D0", price:0, diff:0, pct:0 },
     { name:"TIGER 2차전지테마", ticker:"305540", price:0, diff:0, pct:0 },
     { name:"KODEX 2차전지산업", ticker:"305720", price:0, diff:0, pct:0 },
     { name:"SOL 미국양자컴퓨팅TOP10", ticker:"0023A0", price:0, diff:0, pct:0 },
@@ -553,7 +553,7 @@ async function loadData() {
     }
   } catch(e) {
     console.warn("Firebase 로드 실패, 로컬 사용:", e);
-    try { const s = localStorage.getItem("wl_v5"); if (s) { sections = JSON.parse(s); migrateTickers(); return; } } catch(e2) {}
+    try { const s = localStorage.getItem("wl_v6"); if (s) { sections = JSON.parse(s); migrateTickers(); return; } } catch(e2) {}
   }
   sections = JSON.parse(JSON.stringify(DEFAULT_DATA));
   await saveData();
@@ -564,7 +564,7 @@ async function saveData() {
     await setDoc(DOC_REF, { data: sections });
   } catch(e) {
     console.warn("Firebase 저장 실패, 로컬 저장:", e);
-    localStorage.setItem("wl_v5", JSON.stringify(sections));
+    localStorage.setItem("wl_v6", JSON.stringify(sections));
   }
 }
 
